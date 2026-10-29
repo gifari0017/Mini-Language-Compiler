@@ -1,0 +1,39 @@
+name: build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Install flex, bison, and build tools
+        run: sudo apt-get update && sudo apt-get install -y flex bison build-essential
+
+      - name: Build the compiler
+        run: make
+
+      - name: Valid programs must compile with no errors
+        run: |
+          set -e
+          for f in tests/01_valid_arithmetic.ml tests/02_valid_control_flow.ml tests/03_valid_scopes.ml; do
+            echo "== $f (expect success) =="
+            ./minilang "$f"
+          done
+
+      - name: Error programs must be rejected (non-zero exit)
+        run: |
+          for f in tests/04_lex_illegal_char.ml tests/05_lex_bad_literals.ml tests/06_syntax_missing_semicolon.ml tests/07_syntax_unmatched.ml tests/08_sem_undeclared.ml tests/09_sem_duplicate.ml tests/10_sem_type_mismatch_expr.ml tests/11_sem_assign_mismatch.ml tests/12_sem_scope_uninit.ml; do
+            echo "== $f (expect errors) =="
+            if ./minilang "$f"; then
+              echo "ERROR: $f was accepted but should have failed"; exit 1
+            else
+              echo "OK: rejected as expected"
+            fi
+          done
